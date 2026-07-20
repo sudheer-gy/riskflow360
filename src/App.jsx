@@ -147,13 +147,185 @@ function App() {
   return (
     <AppCtx.Provider value={ctx}>
       <style>{GLOBAL_CSS}</style>
-      {!user ? <Login /> : <Shell />}
+      {!user ? <PublicSite /> : <Shell />}
     </AppCtx.Provider>
   );
 }
 
+// ---------- public marketing site ----------
+function PublicSite() {
+  const [view, setView] = useState("home"); // home | how | solutions | pricing | login
+  const go = (v) => { setView(v); window.scrollTo(0, 0); };
+  if (view === "login") return <Login onBack={() => go("home")} />;
+  return (
+    <div style={P.page}>
+      <PubNav view={view} go={go} />
+      {view === "home" && <PubHome go={go} />}
+      {view === "how" && <PubHow />}
+      {view === "solutions" && <PubSolutions />}
+      {view === "pricing" && <PubPricing go={go} />}
+      <PubFooter />
+    </div>
+  );
+}
+
+function PubNav({ view, go }) {
+  const tabs = [["home", "Home"], ["how", "How It Works"], ["solutions", "Solutions"], ["pricing", "Pricing"]];
+  return (
+    <nav style={P.nav}>
+      <div style={P.navLogo} onClick={() => go("home")}>RiskFlow<span style={{ color: "#1D9E75" }}>360</span></div>
+      <div style={P.navTabs}>
+        {tabs.map(([k, l]) => (
+          <button key={k} onClick={() => go(k)} style={{ ...P.navTab, ...(view === k ? P.navTabActive : {}) }}>{l}</button>
+        ))}
+      </div>
+      <button style={P.navCta} onClick={() => go("login")}>Sign In</button>
+    </nav>
+  );
+}
+
+function PubHome({ go }) {
+  return (
+    <div>
+      <section style={P.hero}>
+        <div style={P.heroBadge}>Canada–Mexico Supply Chain Intelligence</div>
+        <h1 style={P.heroH1}>Know your Mexican suppliers<br /><span style={{ color: "#1D9E75" }}>before they become a risk.</span></h1>
+        <p style={P.heroSub}>RiskFlow360 helps Canadian buyers evaluate, score, audit, and monitor Mexico-based suppliers — with real risk intelligence, USMCA compliance tracking, and continuous early-warning alerts in one platform.</p>
+        <div style={P.heroBtns}>
+          <button style={P.btnPrimary} onClick={() => go("login")}>Explore the Platform →</button>
+          <button style={P.btnGhost} onClick={() => go("how")}>How It Works</button>
+        </div>
+        <div style={P.statRow}>
+          {[["10", "Risk Categories"], ["360°", "Supplier Monitoring"], ["USMCA", "Compliance Ready"], ["CCBS™", "Certification Program"]].map(([n, l]) => (
+            <div key={l} style={P.stat}><div style={P.statNum}>{n}</div><div style={P.statLbl}>{l}</div></div>
+          ))}
+        </div>
+      </section>
+
+      <section style={P.section}>
+        <div style={P.secEyebrow}>The Problem</div>
+        <h2 style={P.secH2}>Canadian buyers are flying blind on Mexican suppliers.</h2>
+        <div style={P.cards3}>
+          {[
+            ["No visibility", "Buyers source from Mexico but have no reliable way to assess supplier risk, compliance, or stability."],
+            ["Manual & reactive", "Supplier vetting lives in spreadsheets and email. Problems surface only after they disrupt production."],
+            ["Compliance exposure", "USMCA origin documentation is scattered and audit-ready records are hard to produce when it matters."],
+          ].map(([t, d]) => (
+            <div key={t} style={P.card}><div style={P.cardTitle}>{t}</div><div style={P.cardText}>{d}</div></div>
+          ))}
+        </div>
+      </section>
+
+      <section style={{ ...P.section, background: "#F1F5F9" }}>
+        <div style={P.secEyebrow}>The Solution</div>
+        <h2 style={P.secH2}>One platform for supplier risk, audits & compliance.</h2>
+        <div style={P.cards3}>
+          {[
+            ["Risk Scoring", "Every supplier scored across 10 weighted categories — food safety, quality, logistics, financial, continuity and more."],
+            ["Audit Management", "Track on-site Mexico audits, findings, and corrective actions from a single system of record."],
+            ["USMCA Compliance", "Certificate-of-origin tracking with 5-year US / 6-year Mexico retention, audit-ready on demand."],
+            ["Early-Warning Alerts", "Automatic alerts when a supplier's risk climbs, a certification expires, or an action goes overdue."],
+            ["CCBS™ Certification", "A proprietary Canada-Certified Border Supplier program that turns your standards into licensable IP."],
+            ["Executive Dashboards", "A live portfolio view your team — and your Canadian clients — can act on every morning."],
+          ].map(([t, d]) => (
+            <div key={t} style={P.card}><div style={P.cardTitle}>{t}</div><div style={P.cardText}>{d}</div></div>
+          ))}
+        </div>
+      </section>
+
+      <section style={P.cta}>
+        <h2 style={{ fontSize: 30, fontWeight: 800, margin: "0 0 12px", letterSpacing: "-0.02em" }}>See the platform in action</h2>
+        <p style={{ fontSize: 16, color: "#94A3B8", margin: "0 0 26px" }}>Sign in to explore the full RiskFlow360 platform with live demo data.</p>
+        <button style={P.btnPrimary} onClick={() => go("login")}>Explore the Platform →</button>
+      </section>
+    </div>
+  );
+}
+
+function PubHow() {
+  const steps = [
+    ["01", "Onboard suppliers", "Add your Mexican suppliers — products, location, certifications, and the Canadian buyer they serve."],
+    ["02", "Assess & score", "Rate each supplier across 10 risk categories. RiskFlow360 computes a weighted 0–100 score and risk tier."],
+    ["03", "Audit on the ground", "Auditors log on-site Mexico audits, findings, and corrective actions — building a compliance record over time."],
+    ["04", "Monitor & alert", "The platform watches continuously and raises early warnings before small issues become disruptions."],
+    ["05", "Certify & report", "Issue CCBS™ certifications and generate executive reports your Canadian clients can rely on."],
+  ];
+  return (
+    <section style={P.section}>
+      <div style={P.secEyebrow}>How It Works</div>
+      <h2 style={P.secH2}>From supplier onboarding to continuous monitoring.</h2>
+      <div style={{ marginTop: 30 }}>
+        {steps.map(([n, t, d]) => (
+          <div key={n} style={P.stepRow}>
+            <div style={P.stepNum}>{n}</div>
+            <div><div style={P.cardTitle}>{t}</div><div style={{ ...P.cardText, maxWidth: 620 }}>{d}</div></div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function PubSolutions() {
+  const secs = [
+    ["Agriculture & Food", "Cold-chain integrity, food-safety certification (Primus GFS, SQF), and traceability for Canadian food importers sourcing produce and ingredients from Mexico."],
+    ["Automotive", "Tier 1 / Tier 2 supplier risk for Ontario–Mexico supply chains — IATF 16949, PPAP/APQP verification, and single-source continuity monitoring."],
+    ["Electronics", "Component supplier qualification, quality-system tracking, and USMCA origin documentation for cross-border electronics manufacturing."],
+    ["For Canadian Buyers", "A live view of every supplier's risk, certifications, and audit status — so procurement decisions rest on current data, not last year's assumptions."],
+  ];
+  return (
+    <section style={P.section}>
+      <div style={P.secEyebrow}>Solutions</div>
+      <h2 style={P.secH2}>Built for the industries that trade across the border.</h2>
+      <div style={P.cards2}>
+        {secs.map(([t, d]) => (
+          <div key={t} style={P.card}><div style={P.cardTitle}>{t}</div><div style={P.cardText}>{d}</div></div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function PubPricing({ go }) {
+  const tiers = [
+    ["Assessment", "Per-supplier audit", ["On-site Mexico supplier audit", "Full 10-category risk assessment", "Written findings report", "Corrective action plan"]],
+    ["Monitoring", "Monthly retainer", ["Everything in Assessment", "Continuous risk monitoring", "Early-warning alerts", "Quarterly executive reporting"], true],
+    ["Platform", "Enterprise", ["Full RiskFlow360 platform access", "Unlimited suppliers & buyers", "CCBS™ certification program", "Custom risk-model weighting"]],
+  ];
+  return (
+    <section style={P.section}>
+      <div style={P.secEyebrow}>Pricing</div>
+      <h2 style={P.secH2}>Engagement models that grow with you.</h2>
+      <p style={{ ...P.cardText, textAlign: "center", maxWidth: 560, margin: "0 auto 30px" }}>From a single supplier audit to a full monitoring platform. Final pricing is tailored to your supplier base and sector.</p>
+      <div style={P.cards3}>
+        {tiers.map(([name, sub, feats, hot]) => (
+          <div key={name} style={{ ...P.priceCard, ...(hot ? P.priceCardHot : {}) }}>
+            {hot && <div style={P.priceBadge}>Most Popular</div>}
+            <div style={P.priceName}>{name}</div>
+            <div style={P.priceSub}>{sub}</div>
+            <div style={{ marginTop: 16 }}>
+              {feats.map((f) => <div key={f} style={P.priceFeat}><span style={{ color: "#1D9E75" }}>✓</span> {f}</div>)}
+            </div>
+            <button style={{ ...(hot ? P.btnPrimary : P.btnGhost), width: "100%", marginTop: 20 }} onClick={() => go("login")}>Get Started</button>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function PubFooter() {
+  return (
+    <footer style={P.footer}>
+      <div style={{ fontWeight: 800, fontSize: 16 }}>RiskFlow<span style={{ color: "#1D9E75" }}>360</span></div>
+      <div style={{ fontSize: 13, color: "#94A3B8" }}>Canada–Mexico Supplier Risk Intelligence</div>
+      <div style={{ fontSize: 12, color: "#64748B" }}>© 2026 RiskFlow360</div>
+    </footer>
+  );
+}
+
 // ---------- login ----------
-function Login() {
+function Login({ onBack }) {
   const { login } = useApp();
   const [role, setRole] = useState("admin");
   const [name, setName] = useState("");
@@ -174,6 +346,7 @@ function Login() {
           </button>
         </div>
         <div style={LS.note}>Demo build — role selection is for preview. Production adds real authentication.</div>
+        {onBack && <button style={LS.back} onClick={onBack}>← Back to home</button>}
       </div>
     </div>
   );
@@ -765,6 +938,46 @@ const LS = {
   input: { width: "100%", padding: "10px 12px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 14 },
   btn: { width: "100%", marginTop: 22, background: "#1D9E75", color: "#fff", border: "none", padding: "12px", borderRadius: 8, fontSize: 14, fontWeight: 600 },
   note: { fontSize: 11, color: "#94A3B8", textAlign: "center", marginTop: 18, lineHeight: 1.5 },
+  back: { display: "block", margin: "14px auto 0", background: "none", border: "none", color: "#64748B", fontSize: 13, fontWeight: 500, cursor: "pointer" },
+};
+
+const P = {
+  page: { fontFamily: "Inter, -apple-system, sans-serif", color: "#0f172a", background: "#fff", minHeight: "100vh" },
+  nav: { position: "sticky", top: 0, zIndex: 50, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 6%", height: 66, background: "rgba(255,255,255,0.92)", backdropFilter: "blur(10px)", borderBottom: "1px solid #E2E8F0" },
+  navLogo: { fontSize: 20, fontWeight: 800, letterSpacing: "-0.03em", cursor: "pointer" },
+  navTabs: { display: "flex", gap: 8 },
+  navTab: { background: "none", border: "none", color: "#475569", fontSize: 14, fontWeight: 500, padding: "8px 14px", borderRadius: 8, cursor: "pointer" },
+  navTabActive: { color: "#0f172a", background: "#F1F5F9" },
+  navCta: { background: "#1D9E75", color: "#fff", border: "none", padding: "9px 20px", borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: "pointer" },
+  hero: { textAlign: "center", padding: "90px 6% 70px", background: "linear-gradient(180deg, #F8FAFC 0%, #fff 100%)" },
+  heroBadge: { display: "inline-block", background: "#1D9E7515", color: "#0f6e56", border: "1px solid #1D9E7530", borderRadius: 100, padding: "6px 16px", fontSize: 13, fontWeight: 600, letterSpacing: "0.03em", marginBottom: 24 },
+  heroH1: { fontSize: "clamp(2.2rem, 5vw, 3.6rem)", fontWeight: 800, letterSpacing: "-0.03em", lineHeight: 1.1, margin: "0 0 20px" },
+  heroSub: { fontSize: 18, color: "#475569", maxWidth: 640, margin: "0 auto 34px", lineHeight: 1.6 },
+  heroBtns: { display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" },
+  btnPrimary: { background: "#1D9E75", color: "#fff", border: "none", padding: "13px 28px", borderRadius: 10, fontSize: 15, fontWeight: 600, cursor: "pointer" },
+  btnGhost: { background: "#fff", color: "#0f172a", border: "1px solid #E2E8F0", padding: "13px 28px", borderRadius: 10, fontSize: 15, fontWeight: 600, cursor: "pointer" },
+  statRow: { display: "flex", justifyContent: "center", gap: 0, flexWrap: "wrap", marginTop: 56, maxWidth: 760, marginLeft: "auto", marginRight: "auto", border: "1px solid #E2E8F0", borderRadius: 16, overflow: "hidden" },
+  stat: { flex: 1, minWidth: 150, padding: "22px 16px", borderRight: "1px solid #E2E8F0" },
+  statNum: { fontSize: 26, fontWeight: 800, color: "#1D9E75", letterSpacing: "-0.02em" },
+  statLbl: { fontSize: 12, color: "#64748B", marginTop: 4, textTransform: "uppercase", letterSpacing: "0.05em" },
+  section: { padding: "70px 6%", maxWidth: 1100, margin: "0 auto" },
+  secEyebrow: { textAlign: "center", fontSize: 13, fontWeight: 700, color: "#1D9E75", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 10 },
+  secH2: { textAlign: "center", fontSize: "clamp(1.6rem, 3vw, 2.4rem)", fontWeight: 800, letterSpacing: "-0.02em", margin: "0 0 8px" },
+  cards3: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 18, marginTop: 34 },
+  cards2: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 18, marginTop: 34 },
+  card: { background: "#fff", border: "1px solid #E2E8F0", borderRadius: 14, padding: 26 },
+  cardTitle: { fontSize: 17, fontWeight: 700, marginBottom: 8, letterSpacing: "-0.01em" },
+  cardText: { fontSize: 14.5, color: "#475569", lineHeight: 1.6 },
+  stepRow: { display: "flex", gap: 24, alignItems: "flex-start", padding: "22px 0", borderBottom: "1px solid #F1F5F9" },
+  stepNum: { fontSize: 22, fontWeight: 800, color: "#1D9E75", minWidth: 48 },
+  cta: { textAlign: "center", padding: "80px 6%", background: "#0F172A", color: "#fff" },
+  priceCard: { position: "relative", background: "#fff", border: "1px solid #E2E8F0", borderRadius: 16, padding: 28 },
+  priceCardHot: { border: "2px solid #1D9E75", boxShadow: "0 12px 40px rgba(29,158,117,0.15)" },
+  priceBadge: { position: "absolute", top: -12, left: "50%", transform: "translateX(-50%)", background: "#1D9E75", color: "#fff", fontSize: 12, fontWeight: 600, padding: "4px 14px", borderRadius: 100 },
+  priceName: { fontSize: 20, fontWeight: 800, letterSpacing: "-0.02em" },
+  priceSub: { fontSize: 13, color: "#64748B", marginTop: 2 },
+  priceFeat: { fontSize: 14, color: "#334155", display: "flex", gap: 8, padding: "6px 0" },
+  footer: { display: "flex", flexDirection: "column", alignItems: "center", gap: 6, padding: "40px 6%", borderTop: "1px solid #E2E8F0", textAlign: "center" },
 };
 
 const S = {
