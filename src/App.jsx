@@ -4,7 +4,8 @@ import React, { useState, useEffect, useMemo, createContext, useContext } from "
    RiskFlow360 — Full Platform
    Canada–Mexico Supplier Risk Intelligence
    Modules: Auth/Roles · Suppliers · Documents · Risk Engine ·
-            Audits · USMCA Compliance · Alerts · Dashboard · CCBS
+            Audits · USMCA Compliance · Alerts · Dashboard · CCBS ·
+            Public Risk Assessment Questionnaire · Intake Requests
    Persistent storage via window.storage (swap for real DB in prod)
    ============================================================ */
 
@@ -28,6 +29,7 @@ const SUPPLIER_STATUS = ["Prospect", "Under Review", "Approved", "Conditional", 
 const AUDIT_TYPES = ["On-site Mexico audit", "Remote document review", "Food safety readiness", "IATF 16949 / APQP-PPAP", "USMCA origin verification", "Continuity assessment"];
 const CCBS_LEVELS = ["None", "CCBS Bronze", "CCBS Silver", "CCBS Gold", "CCBS Platinum"];
 const CERT_TYPES = ["Primus GFS", "SQF", "BRCGS", "IATF 16949", "ISO 9001", "ISO 14001", "SENASICA", "FDA FSVP", "C-TPAT", "OEA (Mexico)"];
+const CONCERN_TYPES = ["Quality issues", "Delivery delays", "Communication gaps", "Financial stability", "Certification / compliance gaps", "Safety or security concerns", "Single-source dependency", "Pricing volatility", "Other"];
 
 const ROLES = {
   admin: "Administrator",
@@ -115,6 +117,7 @@ function App() {
   const [suppliers, setSuppliers] = useState([]);
   const [audits, setAudits] = useState([]);
   const [weights, setWeights] = useState({});
+  const [leads, setLeads] = useState([]);
   const [tab, setTab] = useState("dashboard");
 
   useEffect(() => {
@@ -123,9 +126,11 @@ function App() {
       const sup = await DB.load("rf360:suppliers", null);
       const aud = await DB.load("rf360:audits", null);
       const w = await DB.load("rf360:weights", {});
+      const lds = await DB.load("rf360:leads", []);
       if (sup) { setSuppliers(sup); setAudits(aud || []); }
       else { const s = seedData(); setSuppliers(s.suppliers); setAudits(s.audits); }
       setWeights(w || {});
+      setLeads(lds || []);
       if (sess) setUser(sess);
       setLoaded(true);
     })();
@@ -134,12 +139,13 @@ function App() {
   useEffect(() => { if (loaded) DB.save("rf360:suppliers", suppliers); }, [suppliers, loaded]);
   useEffect(() => { if (loaded) DB.save("rf360:audits", audits); }, [audits, loaded]);
   useEffect(() => { if (loaded) DB.save("rf360:weights", weights); }, [weights, loaded]);
+  useEffect(() => { if (loaded) DB.save("rf360:leads", leads); }, [leads, loaded]);
 
   const login = (u) => { setUser(u); DB.save("rf360:session", u); };
   const logout = () => { setUser(null); DB.save("rf360:session", null); setTab("dashboard"); };
 
   const ctx = {
-    user, suppliers, setSuppliers, audits, setAudits, weights, setWeights, tab, setTab, login, logout,
+    user, suppliers, setSuppliers, audits, setAudits, weights, setWeights, leads, setLeads, tab, setTab, login, logout,
   };
 
   if (!loaded) return <div style={{ padding: 60, textAlign: "center", color: "#64748B", fontFamily: "Inter, sans-serif" }}>Loading RiskFlow360…</div>;
@@ -154,9 +160,10 @@ function App() {
 
 // ---------- public marketing site ----------
 function PublicSite() {
-  const [view, setView] = useState("home"); // home | how | solutions | pricing | login
+  const [view, setView] = useState("home"); // home | how | solutions | pricing | login | assessment
   const go = (v) => { setView(v); window.scrollTo(0, 0); };
   if (view === "login") return <Login onBack={() => go("home")} />;
+  if (view === "assessment") return <PubAssessment onBack={() => go("home")} />;
   return (
     <div style={P.page}>
       <PubNav view={view} go={go} />
@@ -179,7 +186,10 @@ function PubNav({ view, go }) {
           <button key={k} onClick={() => go(k)} style={{ ...P.navTab, ...(view === k ? P.navTabActive : {}) }}>{l}</button>
         ))}
       </div>
-      <button style={P.navCta} onClick={() => go("login")}>Sign In</button>
+      <div style={{ display: "flex", gap: 10 }}>
+        <button style={P.navAssessBtn} onClick={() => go("assessment")}>Get Risk Assessment</button>
+        <button style={P.navCta} onClick={() => go("login")}>Sign In</button>
+      </div>
     </nav>
   );
 }
@@ -192,8 +202,8 @@ function PubHome({ go }) {
         <h1 style={P.heroH1}>Know your Mexican suppliers<br /><span style={{ color: "#1D9E75" }}>before they become a risk.</span></h1>
         <p style={P.heroSub}>RiskFlow360 helps Canadian buyers evaluate, score, audit, and monitor Mexico-based suppliers — with real risk intelligence, USMCA compliance tracking, and continuous early-warning alerts in one platform.</p>
         <div style={P.heroBtns}>
-          <button style={P.btnPrimary} onClick={() => go("login")}>Explore the Platform →</button>
-          <button style={P.btnGhost} onClick={() => go("how")}>How It Works</button>
+          <button style={P.btnPrimary} onClick={() => go("assessment")}>Get a Free Risk Assessment →</button>
+          <button style={P.btnGhost} onClick={() => go("login")}>Explore the Platform</button>
         </div>
         <div style={P.statRow}>
           {[["10", "Risk Categories"], ["360°", "Supplier Monitoring"], ["USMCA", "Compliance Ready"], ["CCBS™", "Certification Program"]].map(([n, l]) => (
@@ -230,6 +240,24 @@ function PubHome({ go }) {
           ].map(([t, d]) => (
             <div key={t} style={P.card}><div style={P.cardTitle}>{t}</div><div style={P.cardText}>{d}</div></div>
           ))}
+        </div>
+      </section>
+
+      <section style={{ ...P.section, background: "#FFF7ED" }}>
+        <div style={P.secEyebrow}>Why It Matters</div>
+        <h2 style={P.secH2}>Common risks Canadian buyers face in Mexico right now.</h2>
+        <div style={P.cards3}>
+          {[
+            ["Labor instability", "Wage disputes, turnover, and workforce shortages disrupting production schedules."],
+            ["Security exposure", "Regional crime and security incidents affecting logistics routes and facility safety."],
+            ["Regulatory shifts", "Changing USMCA origin rules and Mexican compliance requirements."],
+            ["Single-source dependency", "Many buyers rely on one supplier per component with no qualified backup."],
+          ].map(([t, d]) => (
+            <div key={t} style={P.card}><div style={P.cardTitle}>{t}</div><div style={P.cardText}>{d}</div></div>
+          ))}
+        </div>
+        <div style={{ textAlign: "center", marginTop: 30 }}>
+          <button style={P.btnPrimary} onClick={() => go("assessment")}>Start Your Free Risk Assessment →</button>
         </div>
       </section>
 
@@ -288,9 +316,9 @@ function PubSolutions() {
 
 function PubPricing({ go }) {
   const tiers = [
-    ["Assessment", "Per-supplier audit", ["On-site Mexico supplier audit", "Full 10-category risk assessment", "Written findings report", "Corrective action plan"]],
-    ["Monitoring", "Monthly retainer", ["Everything in Assessment", "Continuous risk monitoring", "Early-warning alerts", "Quarterly executive reporting"], true],
-    ["Platform", "Enterprise", ["Full RiskFlow360 platform access", "Unlimited suppliers & buyers", "CCBS™ certification program", "Custom risk-model weighting"]],
+    ["Assessment", "Per-supplier audit", ["On-site Mexico supplier audit", "Full 10-category risk assessment", "Written findings report", "Corrective action plan"], false, "assessment"],
+    ["Monitoring", "Monthly retainer", ["Everything in Assessment", "Continuous risk monitoring", "Early-warning alerts", "Quarterly executive reporting"], true, "login"],
+    ["Platform", "Enterprise", ["Full RiskFlow360 platform access", "Unlimited suppliers & buyers", "CCBS™ certification program", "Custom risk-model weighting"], false, "login"],
   ];
   return (
     <section style={P.section}>
@@ -298,7 +326,7 @@ function PubPricing({ go }) {
       <h2 style={P.secH2}>Engagement models that grow with you.</h2>
       <p style={{ ...P.cardText, textAlign: "center", maxWidth: 560, margin: "0 auto 30px" }}>From a single supplier audit to a full monitoring platform. Final pricing is tailored to your supplier base and sector.</p>
       <div style={P.cards3}>
-        {tiers.map(([name, sub, feats, hot]) => (
+        {tiers.map(([name, sub, feats, hot, target]) => (
           <div key={name} style={{ ...P.priceCard, ...(hot ? P.priceCardHot : {}) }}>
             {hot && <div style={P.priceBadge}>Most Popular</div>}
             <div style={P.priceName}>{name}</div>
@@ -306,7 +334,7 @@ function PubPricing({ go }) {
             <div style={{ marginTop: 16 }}>
               {feats.map((f) => <div key={f} style={P.priceFeat}><span style={{ color: "#1D9E75" }}>✓</span> {f}</div>)}
             </div>
-            <button style={{ ...(hot ? P.btnPrimary : P.btnGhost), width: "100%", marginTop: 20 }} onClick={() => go("login")}>Get Started</button>
+            <button style={{ ...(hot ? P.btnPrimary : P.btnGhost), width: "100%", marginTop: 20 }} onClick={() => go(target)}>Get Started</button>
           </div>
         ))}
       </div>
@@ -321,6 +349,80 @@ function PubFooter() {
       <div style={{ fontSize: 13, color: "#94A3B8" }}>Canada–Mexico Supplier Risk Intelligence</div>
       <div style={{ fontSize: 12, color: "#64748B" }}>© 2026 RiskFlow360</div>
     </footer>
+  );
+}
+
+// ---------- public risk assessment questionnaire ----------
+function PubAssessment({ onBack }) {
+  const { setLeads } = useApp();
+  const [f, setF] = useState({
+    company: "", contact: "", email: "", phone: "",
+    supplierName: "", sector: SECTORS[0], state: MX_STATES[0],
+    relationshipLength: "", concerns: [], details: "",
+  });
+  const [submitted, setSubmitted] = useState(false);
+  const [error, setError] = useState("");
+  const set = (k, v) => setF((p) => ({ ...p, [k]: v }));
+  const toggleConcern = (c) => setF((p) => ({ ...p, concerns: p.concerns.includes(c) ? p.concerns.filter((x) => x !== c) : [...p.concerns, c] }));
+
+  const submit = () => {
+    if (!f.company.trim() || !f.email.trim() || !f.supplierName.trim()) {
+      setError("Please fill in your company name, email, and the supplier name.");
+      return;
+    }
+    const lead = { id: uid(), submitted: today(), status: "New", ...f };
+    setLeads((p) => [...p, lead]);
+    setSubmitted(true);
+  };
+
+  if (submitted) {
+    return (
+      <div style={P.page}>
+        <div style={{ ...P.section, textAlign: "center", maxWidth: 560 }}>
+          <div style={P.heroBadge}>Request Received</div>
+          <h2 style={{ fontSize: 26, fontWeight: 800, margin: "16px 0 12px" }}>Thanks — we've got your request.</h2>
+          <p style={{ ...P.cardText, marginBottom: 26 }}>A RiskFlow360 team member will review the supplier information you provided and follow up at {f.email} within 2 business days to scope the evaluation.</p>
+          <button style={P.btnGhost} onClick={onBack}>← Back to home</button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={P.page}>
+      <div style={{ ...P.section, maxWidth: 640 }}>
+        <button style={S.back} onClick={onBack}>← Back to home</button>
+        <div style={P.secEyebrow}>Free Risk Assessment</div>
+        <h2 style={P.secH2}>Tell us about your Mexican supplier.</h2>
+        <p style={{ ...P.cardText, textAlign: "center", marginBottom: 30 }}>This takes about 3 minutes. We'll use it to scope your first supplier evaluation — no cost or commitment.</p>
+        <div style={P.card}>
+          <Row>
+            <Field label="Your Company Name"><input style={S.input} value={f.company} onChange={(e) => set("company", e.target.value)} /></Field>
+            <Field label="Your Name"><input style={S.input} value={f.contact} onChange={(e) => set("contact", e.target.value)} /></Field>
+          </Row>
+          <Row>
+            <Field label="Email"><input style={S.input} value={f.email} onChange={(e) => set("email", e.target.value)} /></Field>
+            <Field label="Phone"><input style={S.input} value={f.phone} onChange={(e) => set("phone", e.target.value)} /></Field>
+          </Row>
+          <Field label="Supplier Name (Mexico)"><input style={S.input} value={f.supplierName} onChange={(e) => set("supplierName", e.target.value)} /></Field>
+          <Row>
+            <Field label="Sector"><select style={S.input} value={f.sector} onChange={(e) => set("sector", e.target.value)}>{SECTORS.map((x) => <option key={x}>{x}</option>)}</select></Field>
+            <Field label="Mexican State"><select style={S.input} value={f.state} onChange={(e) => set("state", e.target.value)}>{MX_STATES.map((x) => <option key={x}>{x}</option>)}</select></Field>
+          </Row>
+          <Field label="How long have you worked with this supplier?"><input style={S.input} placeholder="e.g. 2 years" value={f.relationshipLength} onChange={(e) => set("relationshipLength", e.target.value)} /></Field>
+          <Field label="What concerns you most? (select all that apply)">
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+              {CONCERN_TYPES.map((c) => (
+                <button key={c} onClick={() => toggleConcern(c)} style={{ ...S.chipBtn, ...(f.concerns.includes(c) ? { background: "#1D9E75", color: "#fff", borderColor: "#1D9E75" } : {}) }}>{c}</button>
+              ))}
+            </div>
+          </Field>
+          <Field label="Anything else we should know?"><textarea style={{ ...S.input, minHeight: 80, resize: "vertical" }} value={f.details} onChange={(e) => set("details", e.target.value)} /></Field>
+          {error && <div style={{ color: "#d03b3b", fontSize: 13, marginBottom: 10 }}>{error}</div>}
+          <button style={{ ...S.primary, width: "100%", marginTop: 8 }} onClick={submit}>Submit Assessment Request</button>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -354,9 +456,11 @@ function Login({ onBack }) {
 
 // ---------- shell / navigation ----------
 function Shell() {
-  const { user, logout, tab, setTab } = useApp();
+  const { user, logout, tab, setTab, leads } = useApp();
+  const newLeads = leads.filter((l) => l.status === "New").length;
   const nav = [
     { key: "dashboard", label: "Dashboard", roles: ["admin", "auditor", "client"] },
+    { key: "intake", label: `Intake Requests${newLeads ? ` (${newLeads})` : ""}`, roles: ["admin", "auditor"] },
     { key: "suppliers", label: "Suppliers", roles: ["admin", "auditor", "client"] },
     { key: "audits", label: "Audits", roles: ["admin", "auditor"] },
     { key: "compliance", label: "USMCA Docs", roles: ["admin", "auditor", "client"] },
@@ -383,6 +487,7 @@ function Shell() {
       </aside>
       <main style={S.main}>
         {tab === "dashboard" && <Dashboard />}
+        {tab === "intake" && <IntakeRequests />}
         {tab === "suppliers" && <Suppliers />}
         {tab === "audits" && <Audits />}
         {tab === "compliance" && <Compliance />}
@@ -426,7 +531,7 @@ function useAlerts() {
 
 // ---------- dashboard ----------
 function Dashboard() {
-  const { suppliers, audits, weights, setTab } = useApp();
+  const { suppliers, audits, weights, setTab, leads } = useApp();
   const alerts = useAlerts();
   const rated = suppliers.map((s) => ({ ...s, risk: computeRisk(s.scores, weights) }));
   const scored = rated.filter((s) => s.risk.score != null);
@@ -435,6 +540,7 @@ function Dashboard() {
   rated.forEach((s) => tiers[s.risk.tier]++);
   const priority = rated.filter((s) => ["Critical", "High"].includes(s.risk.tier)).sort((a, b) => b.risk.score - a.risk.score);
   const openAudits = audits.filter((a) => a.status !== "Closed").length;
+  const newLeads = leads.filter((l) => l.status === "New").length;
 
   return (
     <div>
@@ -444,6 +550,7 @@ function Dashboard() {
         <Kpi label="Avg Risk" value={avg} suffix="/100" tone={avg >= 50 ? "warn" : "good"} />
         <Kpi label="High / Critical" value={tiers.High + tiers.Critical} tone={tiers.High + tiers.Critical ? "warn" : "good"} />
         <Kpi label="Open Audits" value={openAudits} />
+        <Kpi label="New Requests" value={newLeads} tone={newLeads ? "warn" : "good"} />
         <Kpi label="Active Alerts" value={alerts.length} tone={alerts.length ? "warn" : "good"} />
       </div>
       <div style={S.grid2}>
@@ -471,6 +578,15 @@ function Dashboard() {
           {priority.length > 0 && <button style={S.link} onClick={() => setTab("suppliers")}>View all →</button>}
         </Card>
       </div>
+      {newLeads > 0 && (
+        <Card title="New Risk Assessment Requests" right={<button style={S.link} onClick={() => setTab("intake")}>Review →</button>}>
+          {leads.filter((l) => l.status === "New").slice(0, 5).map((l) => (
+            <div key={l.id} style={S.row}>
+              <div><div style={{ fontSize: 14 }}>{l.company} — {l.supplierName}</div><div style={{ fontSize: 12, color: "#64748B" }}>submitted {l.submitted}</div></div>
+            </div>
+          ))}
+        </Card>
+      )}
       <Card title="Recent Alerts" right={<button style={S.link} onClick={() => setTab("alerts")}>All alerts →</button>}>
         {alerts.length === 0 && <Empty text="No active alerts." />}
         {alerts.slice(0, 5).map((a) => (
@@ -479,6 +595,89 @@ function Dashboard() {
               <span style={{ width: 8, height: 8, borderRadius: 4, background: a.sev === "high" ? "#d03b3b" : "#fab219" }} />
               <div><div style={{ fontSize: 14 }}>{a.msg}</div><div style={{ fontSize: 12, color: "#64748B" }}>{a.supplier}</div></div>
             </div>
+          </div>
+        ))}
+      </Card>
+    </div>
+  );
+}
+
+// ---------- intake requests (from public risk assessment questionnaire) ----------
+function IntakeRequests() {
+  const { leads, setLeads, setSuppliers, setTab, user } = useApp();
+  const [detail, setDetail] = useState(null);
+  const canAct = user.role === "admin" || user.role === "auditor";
+
+  const markReviewed = (id) => setLeads((p) => p.map((l) => (l.id === id && l.status === "New") ? { ...l, status: "Reviewed" } : l));
+
+  const convert = (lead) => {
+    const supplier = {
+      id: uid(), name: lead.supplierName, sector: lead.sector, product: "", state: lead.state,
+      contact: "", email: "", phone: "", volume: "", canadianBuyer: lead.company, status: "Under Review",
+      certifications: [], ccbs: "None", ccbsExpiry: "",
+      notes: `Intake from ${lead.company} (${lead.contact || "no name given"}, ${lead.email}). Relationship length: ${lead.relationshipLength || "not given"}. Concerns: ${lead.concerns.join(", ") || "none listed"}. ${lead.details || ""}`.trim(),
+      scores: {}, documents: [],
+    };
+    setSuppliers((p) => [...p, supplier]);
+    setLeads((p) => p.map((l) => l.id === lead.id ? { ...l, status: "Converted" } : l));
+    setDetail(null);
+    setTab("suppliers");
+  };
+
+  if (detail) {
+    const l = detail;
+    return (
+      <div>
+        <button style={S.back} onClick={() => setDetail(null)}>← Back to intake requests</button>
+        <Header title={l.company} sub={`Submitted ${l.submitted}`} action={<StatusPill status={l.status} />} />
+        <div style={S.grid2}>
+          <Card title="Requester">
+            <Meta label="Contact" value={l.contact} />
+            <Meta label="Email" value={l.email} />
+            <Meta label="Phone" value={l.phone} />
+          </Card>
+          <Card title="Supplier in Question">
+            <Meta label="Supplier Name" value={l.supplierName} />
+            <Meta label="Sector" value={l.sector} />
+            <Meta label="State" value={l.state} />
+            <Meta label="Relationship Length" value={l.relationshipLength} />
+          </Card>
+        </div>
+        <Card title="Concerns & Details">
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 12 }}>
+            {l.concerns.length === 0 && <span style={{ fontSize: 13, color: "#94A3B8" }}>None specified</span>}
+            {l.concerns.map((c) => <Tag key={c}>{c}</Tag>)}
+          </div>
+          <div style={{ fontSize: 13, lineHeight: 1.6 }}>{l.details || "—"}</div>
+        </Card>
+        {canAct && (
+          <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
+            {l.status !== "Converted" && <button style={S.primary} onClick={() => convert(l)}>Convert to Supplier Evaluation</button>}
+            {l.status === "New" && <button style={S.ghost} onClick={() => markReviewed(l.id)}>Mark Reviewed</button>}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <Header title="Intake Requests" sub={`${leads.length} risk assessment requests from the public site`} />
+      <div style={S.kpiRow}>
+        <Kpi label="Total" value={leads.length} />
+        <Kpi label="New" value={leads.filter((l) => l.status === "New").length} tone={leads.some((l) => l.status === "New") ? "warn" : "good"} />
+        <Kpi label="Reviewed" value={leads.filter((l) => l.status === "Reviewed").length} />
+        <Kpi label="Converted" value={leads.filter((l) => l.status === "Converted").length} tone="good" />
+      </div>
+      <Card title="All Requests">
+        {leads.length === 0 && <Empty text="No requests yet. Submissions from the public site's risk assessment form will appear here." />}
+        {leads.slice().reverse().map((l) => (
+          <div key={l.id} style={{ ...S.row, cursor: "pointer" }} onClick={() => setDetail(l)}>
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 500 }}>{l.company} — {l.supplierName}</div>
+              <div style={{ fontSize: 12, color: "#64748B" }}>{l.contact} · {l.email} · submitted {l.submitted}</div>
+            </div>
+            <StatusPill status={l.status} />
           </div>
         ))}
       </Card>
@@ -989,7 +1188,7 @@ const Field = ({ label, children }) => (<div style={{ marginBottom: 12, flex: 1 
 const Row = ({ children }) => <div style={{ display: "flex", gap: 10 }}>{children}</div>;
 const Meta = ({ label, value }) => (<div style={{ marginBottom: 8 }}><div style={{ fontSize: 11, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.04em" }}>{label}</div><div style={{ fontSize: 13, color: "#334155" }}>{value || "—"}</div></div>);
 const RiskBadge = ({ risk }) => (<span style={{ display: "inline-flex", alignItems: "center", gap: 6, background: risk.color + "22", color: risk.color, padding: "4px 10px", borderRadius: 8, fontSize: 12, fontWeight: 600, whiteSpace: "nowrap" }}>{risk.score != null ? `${risk.score} · ${risk.tier}` : "Unrated"}</span>);
-const StatusPill = ({ status }) => { const map = { Approved: ["#D1FAE5", "#065F46"], Conditional: ["#FEF3C7", "#92400E"], "Under Review": ["#DBEAFE", "#1E40AF"], Prospect: ["#F1F5F9", "#475569"], Suspended: ["#FEE2E2", "#991B1B"], Open: ["#FEF3C7", "#92400E"], "In Progress": ["#DBEAFE", "#1E40AF"], Closed: ["#D1FAE5", "#065F46"] }; const [bg, c] = map[status] || ["#F1F5F9", "#475569"]; return <span style={{ ...S.pill, background: bg, color: c }}>{status}</span>; };
+const StatusPill = ({ status }) => { const map = { Approved: ["#D1FAE5", "#065F46"], Conditional: ["#FEF3C7", "#92400E"], "Under Review": ["#DBEAFE", "#1E40AF"], Prospect: ["#F1F5F9", "#475569"], Suspended: ["#FEE2E2", "#991B1B"], Open: ["#FEF3C7", "#92400E"], "In Progress": ["#DBEAFE", "#1E40AF"], Closed: ["#D1FAE5", "#065F46"], New: ["#DBEAFE", "#1E40AF"], Reviewed: ["#FEF3C7", "#92400E"], Converted: ["#D1FAE5", "#065F46"] }; const [bg, c] = map[status] || ["#F1F5F9", "#475569"]; return <span style={{ ...S.pill, background: bg, color: c }}>{status}</span>; };
 const CcbsPill = ({ level }) => { const map = { "CCBS Bronze": "#B45309", "CCBS Silver": "#64748B", "CCBS Gold": "#B8860B", "CCBS Platinum": "#0f766e" }; return <span style={{ ...S.pill, background: (map[level] || "#888") + "22", color: map[level] || "#888", fontWeight: 600 }}>{level}</span>; };
 const Tag = ({ children }) => <span style={{ fontSize: 11, padding: "3px 8px", borderRadius: 6, background: "#F1F5F9", color: "#475569", border: "1px solid #E2E8F0" }}>{children}</span>;
 const Chip = ({ children }) => <span style={{ fontSize: 12, fontWeight: 600, color: "#64748B", background: "#F1F5F9", padding: "2px 10px", borderRadius: 12 }}>{children}</span>;
@@ -1025,6 +1224,7 @@ const P = {
   navTab: { background: "none", border: "none", color: "#475569", fontSize: 14, fontWeight: 500, padding: "8px 14px", borderRadius: 8, cursor: "pointer" },
   navTabActive: { color: "#0f172a", background: "#F1F5F9" },
   navCta: { background: "#1D9E75", color: "#fff", border: "none", padding: "9px 20px", borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: "pointer" },
+  navAssessBtn: { background: "#fff", color: "#0f6e56", border: "1px solid #1D9E7550", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 600, cursor: "pointer" },
   hero: { textAlign: "center", padding: "90px 6% 70px", background: "linear-gradient(180deg, #F8FAFC 0%, #fff 100%)" },
   heroBadge: { display: "inline-block", background: "#1D9E7515", color: "#0f6e56", border: "1px solid #1D9E7530", borderRadius: 100, padding: "6px 16px", fontSize: 13, fontWeight: 600, letterSpacing: "0.03em", marginBottom: 24 },
   heroH1: { fontSize: "clamp(2.2rem, 5vw, 3.6rem)", fontWeight: 800, letterSpacing: "-0.03em", lineHeight: 1.1, margin: "0 0 20px" },
