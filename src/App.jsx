@@ -59,6 +59,34 @@ function computeRisk(scores, weights) {
 const TIER_COLOR = { Critical: "#d03b3b", High: "#ec835a", Moderate: "#fab219", Low: "#0ca30c", Unrated: "#B4B2A9" };
 const SCORE_COLOR = { 1: "#0ca30c", 2: "#63991f", 3: "#fab219", 4: "#ec835a", 5: "#d03b3b" };
 
+// ---------- traffic-light map (state-approximate positions, % within map canvas) ----------
+const STATE_COORDS = {
+  "Baja California": { x: 8, y: 14 },
+  "Sonora": { x: 20, y: 26 },
+  "Chihuahua": { x: 33, y: 24 },
+  "Coahuila": { x: 44, y: 30 },
+  "Nuevo León": { x: 51, y: 35 },
+  "Tamaulipas": { x: 58, y: 38 },
+  "Sinaloa": { x: 22, y: 42 },
+  "Aguascalientes": { x: 40, y: 52 },
+  "San Luis Potosí": { x: 49, y: 48 },
+  "Jalisco": { x: 32, y: 56 },
+  "Guanajuato": { x: 42, y: 54 },
+  "Querétaro": { x: 46, y: 56 },
+  "Estado de México": { x: 48, y: 62 },
+  "Puebla": { x: 54, y: 64 },
+  "Michoacán": { x: 36, y: 62 },
+  "Veracruz": { x: 62, y: 58 },
+  "Other": { x: 50, y: 80 },
+};
+
+function trafficLight(tier) {
+  if (tier === "Low") return { color: "#0ca30c", label: "Green — Low Risk" };
+  if (tier === "Moderate") return { color: "#f5b400", label: "Yellow — Moderate Risk" };
+  if (tier === "High" || tier === "Critical") return { color: "#d03b3b", label: "Red — High Risk" };
+  return { color: "#B4B2A9", label: "Unrated" };
+}
+
 // ---------- persistence ----------
 const DB = {
   async load(key, fallback) {
@@ -463,6 +491,7 @@ function Shell() {
   const newLeads = leads.filter((l) => l.status === "New").length;
   const nav = [
     { key: "dashboard", label: "Dashboard", roles: ["admin", "auditor", "client"] },
+    { key: "map", label: "Supplier Map", roles: ["admin", "auditor", "client"] },
     { key: "intake", label: `Intake Requests${newLeads ? ` (${newLeads})` : ""}`, roles: ["admin", "auditor"] },
     { key: "suppliers", label: "Suppliers", roles: ["admin", "auditor", "client"] },
     { key: "audits", label: "Audits", roles: ["admin", "auditor"] },
@@ -490,6 +519,7 @@ function Shell() {
       </aside>
       <main style={S.main}>
         {tab === "dashboard" && <Dashboard />}
+        {tab === "map" && <SupplierMap />}
         {tab === "intake" && <IntakeRequests />}
         {tab === "suppliers" && <Suppliers />}
         {tab === "audits" && <Audits />}
@@ -695,8 +725,86 @@ function IntakeRequests() {
   );
 }
 
-// ---------- suppliers ----------
-function Suppliers() {
+// ---------- interactive supplier map (traffic-light system) ----------
+function SupplierMap() {
+  const { suppliers, weights, setTab } = useApp();
+  const [selected, setSelected] = useState(null);
+
+  const plotted = useMemo(() => {
+    const byState = {};
+    return suppliers.map((s) => {
+      const coord = STATE_COORDS[s.state] || STATE_COORDS["Other"];
+      const n = byState[s.state] || 0;
+      byState[s.state] = n + 1;
+      // small deterministic jitter so suppliers sharing a state don't fully overlap
+      const jx = (n % 3) * 3 - 3;
+      const jy = Math.floor(n / 3) * 3;
+      const risk = computeRisk(s.scores, weights);
+      return { ...s, risk, x: coord.x + jx, y: coord.y + jy };
+    });
+  }, [suppliers, weights]);
+
+  const counts = { Low: 0, Moderate: 0, "High/Critical": 0, Unrated: 0 };
+  plotted.forEach((s) => {
+    if (s.risk.tier === "Low") counts.Low++;
+    else if (s.risk.tier === "Moderate") counts.Moderate++;
+    else if (s.risk.tier === "High" || s.risk.tier === "Critical") counts["High/Critical"]++;
+    else counts.Unrated++;
+  });
+
+  return (
+    <div>
+      <Header title="Supplier Map" sub="Geographic view of supplier risk status across Mexico" />
+      <div style={S.kpiRow}>
+        <Kpi label="Green · Low" value={counts.Low} tone="good" />
+        <Kpi label="Yellow · Moderate" value={counts.Moderate} />
+        <Kpi label="Red · High/Critical" value={counts["High/Critical"]} tone={counts["High/Critical"] ? "warn" : "good"} />
+        <Kpi label="Unrated" value={counts.Unrated} />
+      </div>
+      <div style={S.grid2}>
+        <Card title="Mexico — Supplier Risk Map">
+          <div style={M.canvas}>
+            {plotted.map((s) => {
+              const tl = trafficLight(s.risk.tier);
+              return (
+                <div
+                  key={s.id}
+                  onClick={() => setSelected(s)}
+                  title={s.name}
+                  style={{ ...M.dot, left: `${s.x}%`, top: `${s.y}%`, background: tl.color, boxShadow: selected?.id === s.id ? `0 0 0 4px ${tl.color}33` : "none" }}
+                />
+              );
+            })}
+            {plotted.length === 0 && <div style={{ ...M.empty }}>No suppliers to plot yet.</div>}
+          </div>
+          <div style={{ display: "flex", gap: 16, marginTop: 14, fontSize: 12, color: "#64748B" }}>
+            <span><span style={{ ...M.legendDot, background: "#0ca30c" }} /> Low Risk</span>
+            <span><span style={{ ...M.legendDot, background: "#f5b400" }} /> Moderate Risk</span>
+            <span><span style={{ ...M.legendDot, background: "#d03b3b" }} /> High / Critical</span>
+            <span><span style={{ ...M.legendDot, background: "#B4B2A9" }} /> Unrated</span>
+          </div>
+          <div style={{ fontSize: 11, color: "#94A3B8", marginTop: 10 }}>Positions are approximate by state, for portfolio-level orientation — not precise facility coordinates. Production can add exact geocoding per supplier address.</div>
+        </Card>
+        <Card title={selected ? selected.name : "Select a supplier"} right={selected && <RiskBadge risk={selected.risk} />}>
+          {!selected && <Empty text="Click a dot on the map to see supplier details." />}
+          {selected && (
+            <div>
+              <Meta label="Sector" value={selected.sector} />
+              <Meta label="Location" value={`${selected.state}, Mexico`} />
+              <Meta label="Canadian Buyer" value={selected.canadianBuyer} />
+              <Meta label="Status" value={<StatusPill status={selected.status} />} />
+              <Meta label="Traffic Light" value={<span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><span style={{ ...M.legendDot, background: trafficLight(selected.risk.tier).color }} />{trafficLight(selected.risk.tier).label}</span>} />
+              <Meta label="Reassessment" value={<ReviewPill due={selected.nextReviewDue} />} />
+              <button style={{ ...S.primaryInline, marginTop: 10 }} onClick={() => setTab("suppliers")}>View in Suppliers →</button>
+            </div>
+          )}
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+
   const { suppliers, setSuppliers, setAudits, weights, user } = useApp();
   const [q, setQ] = useState(""); const [sector, setSector] = useState("All"); const [status, setStatus] = useState("All");
   const [editing, setEditing] = useState(null); const [detail, setDetail] = useState(null);
@@ -1287,6 +1395,13 @@ const P = {
   priceSub: { fontSize: 13, color: "#64748B", marginTop: 2 },
   priceFeat: { fontSize: 14, color: "#334155", display: "flex", gap: 8, padding: "6px 0" },
   footer: { display: "flex", flexDirection: "column", alignItems: "center", gap: 6, padding: "40px 6%", borderTop: "1px solid #E2E8F0", textAlign: "center" },
+};
+
+const M = {
+  canvas: { position: "relative", width: "100%", height: 380, background: "linear-gradient(160deg, #F0FDF4 0%, #F8FAFC 60%, #EFF6FF 100%)", border: "1px solid #E2E8F0", borderRadius: 12, overflow: "hidden" },
+  dot: { position: "absolute", width: 16, height: 16, borderRadius: 8, cursor: "pointer", transform: "translate(-50%, -50%)", border: "2px solid #fff", boxShadow: "0 2px 6px rgba(0,0,0,0.25)" },
+  legendDot: { display: "inline-block", width: 10, height: 10, borderRadius: 5, marginRight: 6, verticalAlign: "middle" },
+  empty: { position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", color: "#94A3B8", fontSize: 14 },
 };
 
 const S = {
