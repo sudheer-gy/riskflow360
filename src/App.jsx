@@ -80,6 +80,7 @@ function seedData() {
       scores: { foodSafety: 2, quality: 2, capacity: 2, traceability: 3, coldChain: 4, logistics: 3, regulatory: 2, financial: 2, continuity: 3, geopolitical: 2 },
       notes: "Strong food safety record. Cold-chain gaps flagged during summer months.",
       documents: [{ id: uid(), name: "Primus GFS Certificate 2026.pdf", type: "Certification", uploaded: today(), expiry: addDays(today(), 300) }],
+      assessmentDate: addDays(today(), -20), nextReviewDue: addDays(today(), 70),
     },
     {
       id: s2, name: "AutoPartes Norte", sector: "Automotive", product: "Stamped metal components (Tier 2)",
@@ -89,6 +90,7 @@ function seedData() {
       scores: { foodSafety: 1, quality: 2, capacity: 3, traceability: 2, coldChain: 1, logistics: 4, regulatory: 3, financial: 4, continuity: 4, geopolitical: 3 },
       notes: "Single-source for two components. Financial stability under review after 2025 downturn.",
       documents: [{ id: uid(), name: "IATF 16949 Cert.pdf", type: "Certification", uploaded: today(), expiry: addDays(today(), 120) }],
+      assessmentDate: addDays(today(), -82), nextReviewDue: addDays(today(), 8),
     },
     {
       id: s3, name: "Electrónica Bajío", sector: "Electronics", product: "PCB assemblies",
@@ -98,6 +100,7 @@ function seedData() {
       scores: { quality: 3, capacity: 2, traceability: 3, logistics: 3, regulatory: 4, financial: 3, continuity: 3, geopolitical: 2 },
       notes: "New prospect. USMCA documentation incomplete — origin certificates pending.",
       documents: [],
+      assessmentDate: "", nextReviewDue: "",
     },
   ];
   const audits = [
@@ -516,6 +519,11 @@ function useAlerts() {
         if (d.expiry) { const dd = Math.round((new Date(d.expiry) - new Date()) / 86400000);
           if (dd <= 45 && dd >= 0) out.push({ id: "d" + d.id, sev: dd <= 15 ? "high" : "med", supplier: s.name, msg: `${d.name} expires in ${dd} days` }); }
       });
+      if (s.nextReviewDue) {
+        const rd = Math.round((new Date(s.nextReviewDue) - new Date()) / 86400000);
+        if (rd < 0) out.push({ id: "rv" + s.id, sev: "high", supplier: s.name, msg: `Reassessment overdue (was due ${s.nextReviewDue})` });
+        else if (rd <= 14) out.push({ id: "rv" + s.id, sev: "med", supplier: s.name, msg: `Reassessment due in ${rd} days` });
+      }
     });
     audits.forEach((a) => {
       if (a.status !== "Closed" && a.correctiveDue) {
@@ -541,6 +549,7 @@ function Dashboard() {
   const priority = rated.filter((s) => ["Critical", "High"].includes(s.risk.tier)).sort((a, b) => b.risk.score - a.risk.score);
   const openAudits = audits.filter((a) => a.status !== "Closed").length;
   const newLeads = leads.filter((l) => l.status === "New").length;
+  const dueForReview = suppliers.filter((s) => s.nextReviewDue && (new Date(s.nextReviewDue) - new Date()) / 86400000 <= 14).length;
 
   return (
     <div>
@@ -550,6 +559,7 @@ function Dashboard() {
         <Kpi label="Avg Risk" value={avg} suffix="/100" tone={avg >= 50 ? "warn" : "good"} />
         <Kpi label="High / Critical" value={tiers.High + tiers.Critical} tone={tiers.High + tiers.Critical ? "warn" : "good"} />
         <Kpi label="Open Audits" value={openAudits} />
+        <Kpi label="Due for Review" value={dueForReview} tone={dueForReview ? "warn" : "good"} />
         <Kpi label="New Requests" value={newLeads} tone={newLeads ? "warn" : "good"} />
         <Kpi label="Active Alerts" value={alerts.length} tone={alerts.length ? "warn" : "good"} />
       </div>
@@ -725,6 +735,7 @@ function Suppliers() {
               <Meta label="Location" value={`${s.state}, MX`} />
               <Meta label="Buyer" value={s.canadianBuyer} />
               <Meta label="Status" value={<StatusPill status={s.status} />} />
+              <Meta label="Review" value={<ReviewPill due={s.nextReviewDue} />} />
             </div>
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap", borderTop: "1px solid #F1F5F9", paddingTop: 10 }}>
               {s.ccbs !== "None" && <CcbsPill level={s.ccbs} />}
@@ -828,6 +839,12 @@ function SupplierDetail({ supplier: s, onBack, onEdit, canEdit }) {
           <Meta label="Annual Volume" value={s.volume} />
           <Meta label="Canadian Buyer" value={s.canadianBuyer} />
           <Meta label="Status" value={<StatusPill status={s.status} />} />
+          <Meta label="Reassessment" value={
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+              {s.assessmentDate ? `Last assessed ${s.assessmentDate}` : "Not yet assessed"}
+              <ReviewPill due={s.nextReviewDue} />
+            </span>
+          } />
           <Meta label="Notes" value={s.notes} />
         </Card>
         <Card title="Risk Profile" right={<RiskBadge risk={s.risk} />}>
@@ -880,9 +897,11 @@ function SupplierForm({ initial, onSave, onCancel }) {
     volume: initial?.volume || "", canadianBuyer: initial?.canadianBuyer || "", status: initial?.status || "Prospect",
     certifications: initial?.certifications || [], ccbs: initial?.ccbs || "None", ccbsExpiry: initial?.ccbsExpiry || "",
     notes: initial?.notes || "", scores: initial?.scores || {}, documents: initial?.documents || [],
+    assessmentDate: initial?.assessmentDate || "", nextReviewDue: initial?.nextReviewDue || "",
   }));
   const set = (k, v) => setF((p) => ({ ...p, [k]: v }));
   const setScore = (k, v) => setF((p) => ({ ...p, scores: { ...p.scores, [k]: v } }));
+  const markReassessed = () => setF((p) => ({ ...p, assessmentDate: today(), nextReviewDue: addDays(today(), 90) }));
   const toggleCert = (c) => setF((p) => ({ ...p, certifications: p.certifications.includes(c) ? p.certifications.filter((x) => x !== c) : [...p.certifications, c] }));
   const addDoc = () => setF((p) => ({ ...p, documents: [...p.documents, { id: uid(), name: "New Document.pdf", type: "Certification", uploaded: today(), expiry: "" }] }));
   const setDoc = (id, k, v) => setF((p) => ({ ...p, documents: p.documents.map((d) => d.id === id ? { ...d, [k]: v } : d) }));
@@ -925,6 +944,12 @@ function SupplierForm({ initial, onSave, onCancel }) {
                 </div>
               </div>
             ))}
+            <div style={{ marginTop: 14, paddingTop: 14, borderTop: "1px solid #F1F5F9" }}>
+              <div style={{ fontSize: 12, color: "#64748B", marginBottom: 8 }}>
+                {f.assessmentDate ? `Last assessed ${f.assessmentDate} · next review due ${f.nextReviewDue}` : "Not yet formally assessed"}
+              </div>
+              <button style={S.smallBtn} type="button" onClick={markReassessed}>Mark Reassessed Today (resets 90-day clock)</button>
+            </div>
           </Card>
           <div style={{ height: 16 }} />
           <Card title="Certifications">
@@ -1190,6 +1215,14 @@ const Meta = ({ label, value }) => (<div style={{ marginBottom: 8 }}><div style=
 const RiskBadge = ({ risk }) => (<span style={{ display: "inline-flex", alignItems: "center", gap: 6, background: risk.color + "22", color: risk.color, padding: "4px 10px", borderRadius: 8, fontSize: 12, fontWeight: 600, whiteSpace: "nowrap" }}>{risk.score != null ? `${risk.score} · ${risk.tier}` : "Unrated"}</span>);
 const StatusPill = ({ status }) => { const map = { Approved: ["#D1FAE5", "#065F46"], Conditional: ["#FEF3C7", "#92400E"], "Under Review": ["#DBEAFE", "#1E40AF"], Prospect: ["#F1F5F9", "#475569"], Suspended: ["#FEE2E2", "#991B1B"], Open: ["#FEF3C7", "#92400E"], "In Progress": ["#DBEAFE", "#1E40AF"], Closed: ["#D1FAE5", "#065F46"], New: ["#DBEAFE", "#1E40AF"], Reviewed: ["#FEF3C7", "#92400E"], Converted: ["#D1FAE5", "#065F46"] }; const [bg, c] = map[status] || ["#F1F5F9", "#475569"]; return <span style={{ ...S.pill, background: bg, color: c }}>{status}</span>; };
 const CcbsPill = ({ level }) => { const map = { "CCBS Bronze": "#B45309", "CCBS Silver": "#64748B", "CCBS Gold": "#B8860B", "CCBS Platinum": "#0f766e" }; return <span style={{ ...S.pill, background: (map[level] || "#888") + "22", color: map[level] || "#888", fontWeight: 600 }}>{level}</span>; };
+const ReviewPill = ({ due }) => {
+  if (!due) return <span style={{ fontSize: 11, color: "#94A3B8" }}>Not scheduled</span>;
+  const dd = Math.round((new Date(due) - new Date()) / 86400000);
+  let bg = "#D1FAE5", c = "#065F46", label = `Review in ${dd}d`;
+  if (dd < 0) { bg = "#FEE2E2"; c = "#991B1B"; label = "Review overdue"; }
+  else if (dd <= 14) { bg = "#FEF3C7"; c = "#92400E"; label = `Review in ${dd}d`; }
+  return <span style={{ ...S.pill, background: bg, color: c }}>{label}</span>;
+};
 const Tag = ({ children }) => <span style={{ fontSize: 11, padding: "3px 8px", borderRadius: 6, background: "#F1F5F9", color: "#475569", border: "1px solid #E2E8F0" }}>{children}</span>;
 const Chip = ({ children }) => <span style={{ fontSize: 12, fontWeight: 600, color: "#64748B", background: "#F1F5F9", padding: "2px 10px", borderRadius: 12 }}>{children}</span>;
 const SeverityText = ({ sev }) => { const c = { None: "#64748B", Minor: "#fab219", Major: "#ec835a", Critical: "#d03b3b" }[sev] || "#64748B"; return <span style={{ color: c, fontWeight: 600, fontSize: 12 }}>{sev}</span>; };
