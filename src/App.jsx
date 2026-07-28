@@ -805,6 +805,8 @@ function SupplierMap() {
 }
 
 
+// ---------- suppliers ----------
+function Suppliers() {
   const { suppliers, setSuppliers, setAudits, weights, user } = useApp();
   const [q, setQ] = useState(""); const [sector, setSector] = useState("All"); const [status, setStatus] = useState("All");
   const [editing, setEditing] = useState(null); const [detail, setDetail] = useState(null);
