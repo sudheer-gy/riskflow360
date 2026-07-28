@@ -4,7 +4,7 @@ import React, { useState, useEffect, useMemo, createContext, useContext } from "
    RiskFlow360 — Full Platform
    Canada–Mexico Supplier Risk Intelligence
    Modules: Auth/Roles · Suppliers · Documents · Risk Engine ·
-            Audits · USMCA Compliance · Alerts · Dashboard · CCBS ·
+            Audits · USMCA Compliance · Alerts · Dashboard · CCBS Risk Rating ·
             Public Risk Assessment Questionnaire · Intake Requests
    Persistent storage via window.storage (swap for real DB in prod)
    ============================================================ */
@@ -237,7 +237,7 @@ function PubHome({ go }) {
           <button style={P.btnGhost} onClick={() => go("login")}>Explore the Platform</button>
         </div>
         <div style={P.statRow}>
-          {[["10", "Risk Categories"], ["360°", "Supplier Monitoring"], ["USMCA", "Compliance Ready"], ["CCBS™", "Certification Program"]].map(([n, l]) => (
+          {[["10", "Risk Categories"], ["360°", "Supplier Monitoring"], ["USMCA", "Compliance Ready"], ["CCBS™", "Risk Rating Program"]].map(([n, l]) => (
             <div key={l} style={P.stat}><div style={P.statNum}>{n}</div><div style={P.statLbl}>{l}</div></div>
           ))}
         </div>
@@ -266,7 +266,7 @@ function PubHome({ go }) {
             ["Audit Management", "Track on-site Mexico audits, findings, and corrective actions from a single system of record."],
             ["USMCA Compliance", "Certificate-of-origin tracking with 5-year US / 6-year Mexico retention, audit-ready on demand."],
             ["Early-Warning Alerts", "Automatic alerts when a supplier's risk climbs, a certification expires, or an action goes overdue."],
-            ["CCBS™ Certification", "A proprietary Canada-Certified Border Supplier program that turns your standards into licensable IP."],
+            ["CCBS™ Risk Rating", "An independent Canada-Mexico Border Supplier risk rating — not a certification — that turns your standards into licensable IP."],
             ["Executive Dashboards", "A live portfolio view your team — and your Canadian clients — can act on every morning."],
           ].map(([t, d]) => (
             <div key={t} style={P.card}><div style={P.cardTitle}>{t}</div><div style={P.cardText}>{d}</div></div>
@@ -307,7 +307,7 @@ function PubHow() {
     ["02", "Assess & score", "Rate each supplier across 10 risk categories. RiskFlow360 computes a weighted 0–100 score and risk tier."],
     ["03", "Audit on the ground", "Auditors log on-site Mexico audits, findings, and corrective actions — building a compliance record over time."],
     ["04", "Monitor & alert", "The platform watches continuously and raises early warnings before small issues become disruptions."],
-    ["05", "Certify & report", "Issue CCBS™ certifications and generate executive reports your Canadian clients can rely on."],
+    ["05", "Rate & report", "Issue CCBS™ risk ratings and generate executive reports your Canadian clients can rely on."],
   ];
   return (
     <section style={P.section}>
@@ -349,7 +349,7 @@ function PubPricing({ go }) {
   const tiers = [
     ["Assessment", "Per-supplier audit", ["On-site Mexico supplier audit", "Full 10-category risk assessment", "Written findings report", "Corrective action plan"], false, "assessment"],
     ["Monitoring", "Monthly retainer", ["Everything in Assessment", "Continuous risk monitoring", "Early-warning alerts", "Quarterly executive reporting"], true, "login"],
-    ["Platform", "Enterprise", ["Full RiskFlow360 platform access", "Unlimited suppliers & buyers", "CCBS™ certification program", "Custom risk-model weighting"], false, "login"],
+    ["Platform", "Enterprise", ["Full RiskFlow360 platform access", "Unlimited suppliers & buyers", "CCBS™ risk rating program", "Custom risk-model weighting"], false, "login"],
   ];
   return (
     <section style={P.section}>
@@ -543,7 +543,7 @@ function useAlerts() {
       if (s.ccbsExpiry && s.ccbs !== "None") {
         const days = Math.round((new Date(s.ccbsExpiry) - new Date()) / 86400000);
         if (days <= 60 && days >= 0) out.push({ id: "c" + s.id, sev: days <= 30 ? "high" : "med", supplier: s.name, msg: `${s.ccbs} expires in ${days} days` });
-        if (days < 0) out.push({ id: "cx" + s.id, sev: "high", supplier: s.name, msg: `${s.ccbs} certification expired` });
+        if (days < 0) out.push({ id: "cx" + s.id, sev: "high", supplier: s.name, msg: `${s.ccbs} rating expired` });
       }
       (s.documents || []).forEach((d) => {
         if (d.expiry) { const dd = Math.round((new Date(d.expiry) - new Date()) / 86400000);
@@ -969,8 +969,8 @@ function SupplierDetail({ supplier: s, onBack, onEdit, canEdit }) {
         </Card>
       </div>
       <div style={S.grid2}>
-        <Card title="Certifications & CCBS">
-          <div style={{ marginBottom: 12 }}>{s.ccbs !== "None" ? <CcbsPill level={s.ccbs} /> : <span style={{ fontSize: 13, color: "#94A3B8" }}>No CCBS certification</span>}
+        <Card title="Certifications & CCBS Rating">
+          <div style={{ marginBottom: 12 }}>{s.ccbs !== "None" ? <CcbsPill level={s.ccbs} /> : <span style={{ fontSize: 13, color: "#94A3B8" }}>No CCBS rating</span>}
             {s.ccbsExpiry && s.ccbs !== "None" && <span style={{ fontSize: 12, color: "#64748B", marginLeft: 8 }}>expires {s.ccbsExpiry}</span>}</div>
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>{(s.certifications || []).map((c) => <Tag key={c}>{c}</Tag>)}</div>
         </Card>
@@ -1198,7 +1198,7 @@ function Compliance() {
   );
 }
 
-// ---------- CCBS certification program ----------
+// ---------- CCBS risk rating program ----------
 function Certification() {
   const { suppliers } = useApp();
   const certified = suppliers.filter((s) => s.ccbs !== "None");
@@ -1206,15 +1206,15 @@ function Certification() {
   CCBS_LEVELS.filter((l) => l !== "None").forEach((l) => byLevel[l] = certified.filter((s) => s.ccbs === l).length);
   return (
     <div>
-      <Header title="CCBS Certification Program" sub="Canada-Certified Border Supplier — proprietary certification tracking" />
+      <Header title="CCBS Risk Rating Program" sub="Canada-Mexico Border Supplier rating — independent risk evaluation, not a certification" />
       <div style={S.kpiRow}>
-        <Kpi label="Certified Suppliers" value={certified.length} tone="good" />
-        <Kpi label="Uncertified" value={suppliers.length - certified.length} />
+        <Kpi label="Rated Suppliers" value={certified.length} tone="good" />
+        <Kpi label="No Rating" value={suppliers.length - certified.length} />
         <Kpi label="Expiring ≤60d" value={certified.filter((s) => s.ccbsExpiry && (new Date(s.ccbsExpiry) - new Date()) / 86400000 <= 60).length} tone="warn" />
         <Kpi label="Coverage" value={suppliers.length ? Math.round((certified.length / suppliers.length) * 100) : 0} suffix="%" />
       </div>
       <div style={S.grid2}>
-        <Card title="Certification Levels">
+        <Card title="CCBS Rating Levels">
           {CCBS_LEVELS.filter((l) => l !== "None").map((l) => (
             <div key={l} style={S.row}>
               <CcbsPill level={l} />
@@ -1222,11 +1222,11 @@ function Certification() {
             </div>
           ))}
           <div style={{ fontSize: 12, color: "#64748B", marginTop: 12, lineHeight: 1.6 }}>
-            CCBS is the proprietary certification licensed to suppliers meeting Canada–Mexico trade standards. Sector variants: CCBSAuto, CCBSLogistics, CCBSElectronics.
+            CCBS is RiskFlow360's proprietary risk rating applied to suppliers meeting Canada–Mexico trade criteria — an independent evaluation, not a third-party certification. Sector variants: CCBSAuto, CCBSLogistics, CCBSElectronics.
           </div>
         </Card>
-        <Card title="Certified Suppliers" right={<Chip>{certified.length}</Chip>}>
-          {certified.length === 0 && <Empty text="No certified suppliers yet." />}
+        <Card title="Rated Suppliers" right={<Chip>{certified.length}</Chip>}>
+          {certified.length === 0 && <Empty text="No rated suppliers yet." />}
           {certified.map((s) => {
             const days = s.ccbsExpiry ? Math.round((new Date(s.ccbsExpiry) - new Date()) / 86400000) : null;
             return (
@@ -1239,11 +1239,11 @@ function Certification() {
           })}
         </Card>
       </div>
-      <Card title="Public Verification Preview">
-        <div style={{ fontSize: 13, color: "#64748B", marginBottom: 12 }}>Canadian buyers can verify a supplier's CCBS status via a public lookup. Production adds a public verification page.</div>
+      <Card title="Public Rating Lookup Preview">
+        <div style={{ fontSize: 13, color: "#64748B", marginBottom: 12 }}>Canadian buyers can look up a supplier's CCBS rating via a public lookup. Production adds a public rating-lookup page.</div>
         {certified.slice(0, 3).map((s) => (
           <div key={s.id} style={{ ...S.row, background: "#F8FAFC", padding: "12px 14px", borderRadius: 8, border: "1px solid #E2E8F0", marginBottom: 8 }}>
-            <div><div style={{ fontSize: 14, fontWeight: 600 }}>{s.name}</div><div style={{ fontSize: 12, color: "#64748B" }}>Verified · {s.state}, MX</div></div>
+            <div><div style={{ fontSize: 14, fontWeight: 600 }}>{s.name}</div><div style={{ fontSize: 12, color: "#64748B" }}>Rated · {s.state}, MX</div></div>
             <CcbsPill level={s.ccbs} />
           </div>
         ))}
